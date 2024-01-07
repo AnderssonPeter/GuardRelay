@@ -10,7 +10,7 @@ ARG APP_VERSION=0.0.0
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["GuardRelay/GuardRelay.csproj", "GuardRelay/"]
-RUN dotnet restore "./GuardRelay/./GuardRelay.csproj"
+RUN dotnet restore "./GuardRelay/GuardRelay.csproj"
 COPY . .
 WORKDIR "/src/GuardRelay"
 RUN dotnet build "./GuardRelay.csproj" -c $BUILD_CONFIGURATION -o /app/build /property:Version=${APP_VERSION}
