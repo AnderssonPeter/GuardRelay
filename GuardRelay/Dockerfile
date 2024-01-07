@@ -5,7 +5,7 @@ FROM mcr.microsoft.com/dotnet/runtime:8.0 AS base
 USER app
 WORKDIR /app
 
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG APP_VERSION=0.0.0
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
