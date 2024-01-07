@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "GuardRelay": {
+      "commandName": "Project"
+    },
+    "Docker": {
+      "commandName": "Docker"
+    }
+  }
+}
