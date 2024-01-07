@@ -41,7 +41,7 @@ jobs:
       with:
         context: .
         platforms: linux/amd64,linux/arm/v7,linux/arm64/v8
-        file: ./GuardRelay/Dockerfile
+        file: GuardRelay/Dockerfile
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
