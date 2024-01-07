@@ -19,7 +19,9 @@
 </p>
 <br />
 
-![GitHub License](https://img.shields.io/github/license/anderssonpeter/GuardRelay)
+[![GitHub Tag](https://img.shields.io/github/v/tag/anderssonpeter/guardrelay)](https://github.com/AnderssonPeter/GuardRelay/pkgs/container/guardrelay)
+[![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/anderssonpeter/GuardRelay/.github%2Fworkflows%2Fpublish.yml)](https://github.com/AnderssonPeter/GuardRelay/actions/workflows/publish.yml)
+[![GitHub License](https://img.shields.io/github/license/anderssonpeter/GuardRelay)](https://github.com/AnderssonPeter/GuardRelay/blob/main/LICENSE)
 
 
 ## Table of Contents
