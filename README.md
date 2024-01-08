@@ -49,9 +49,29 @@ It currently creates the following entities in home assistant:
 
 ## Getting Started
 
-Add docker compose example
+```yaml
+version: "3.8"
+services:
+  guardrelay:
+    container_name: guardrelay
+    image: "ghcr.io/anderssonpeter/guardrelay:latest"
+    restart: unless-stopped
+    mem_limit: 128M
+    cpus: 0.5
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - TZ=Europe/Stockholm
+      - Application__Application=/config/GuardRelay.sqlite
+      - MQTT__Connection__Server=hostname
+      - ChargeAmpGuard__Uri=ws://192.168.0.15/ws
+      - ChargeAmpGuard__Pin=123456
+    volumes:
+      - ./guardrelay/config:/config
+```
 
 ## Todo:
 [ ] Healthcheck
 [ ] Dotnet format
 [ ] Loki logging
+[ ] Document all settings

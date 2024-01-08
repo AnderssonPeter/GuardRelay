@@ -29,5 +29,16 @@ builder.Services.AddDbContext<GuardRelayContext>((serviceProvider, options) => {
     options.UseSqlite($"Data Source={applicationOptions.DatabaseLocation}");
 });
 using IHost host = builder.Build();
-
-await host.RunAsync();
+try
+{
+    await host.RunAsync();
+}
+catch(Exception ex)
+{
+    Console.WriteLine(ex.ToString());
+    if (args.Contains("--pause-on-crash"))
+    {
+        Console.WriteLine("pause on crash detected, sleeping for 10 minutes");
+        await Task.Delay(1000 * 60 * 10);
+    }
+}
