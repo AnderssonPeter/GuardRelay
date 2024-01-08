@@ -13,6 +13,13 @@ foreach(var arg in args)
     Console.WriteLine($"\t{arg}");
 }
 
+
+if (args.Contains("--pause-on-start"))
+{
+    Console.WriteLine("sleeping for 10 minutes");
+    await Task.Delay(1000 * 60 * 10);
+}
+
 HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
 if (builder.Environment.IsDevelopment())
 {
@@ -38,8 +45,8 @@ builder.Services.AddDbContext<GuardRelayContext>((serviceProvider, options) => {
 using IHost host = builder.Build();
 
 await host.RunAsync();
-if (args.Contains("--pause-on-crash"))
+if (args.Contains("--pause-on-exit"))
 {
-    Console.WriteLine("pause on crash detected, sleeping for 10 minutes");
+    Console.WriteLine("sleeping for 10 minutes");
     await Task.Delay(1000 * 60 * 10);
 }
