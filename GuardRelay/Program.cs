@@ -6,6 +6,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
+Console.WriteLine("Starting application");
+Console.WriteLine("Arguments:");
+foreach(var arg in args)
+{
+    Console.WriteLine($"\t{arg}");
+}
+
 HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
 if (builder.Environment.IsDevelopment())
 {
@@ -35,6 +42,7 @@ try
 }
 catch(Exception ex)
 {
+    Console.WriteLine("Exception occurred");
     Console.WriteLine(ex.ToString());
     if (args.Contains("--pause-on-crash"))
     {

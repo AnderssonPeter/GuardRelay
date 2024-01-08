@@ -71,7 +71,7 @@ services:
 ```
 
 ## Todo:
-[ ] Healthcheck
-[ ] Dotnet format
-[ ] Loki logging
-[ ] Document all settings
+- [ ] Healthcheck
+- [ ] Dotnet format
+- [ ] Loki logging
+- [ ] Document all settings
