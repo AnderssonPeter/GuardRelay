@@ -17,7 +17,6 @@ else
 }
 builder.Configuration.AddJsonFile("appsettings.json", false);
 builder.Configuration.AddEnvironmentVariables();
-builder.Configuration.AddEnvironmentVariables();
 
 builder.Services.AddOptions<ChargeAmpGuardClientOptions>().BindConfiguration("ChargeAmpGuard");
 builder.Services.AddOptions<MQTTOptions>().BindConfiguration("MQTT");
