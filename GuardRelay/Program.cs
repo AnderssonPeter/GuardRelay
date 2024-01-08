@@ -6,20 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
-Console.WriteLine("Starting application");
-Console.WriteLine("Arguments:");
-foreach(var arg in args)
-{
-    Console.WriteLine($"\t{arg}");
-}
-
-
-if (args.Contains("--pause-on-start"))
-{
-    Console.WriteLine("sleeping for 10 minutes");
-    await Task.Delay(1000 * 60 * 10);
-}
-
 HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
 if (builder.Environment.IsDevelopment())
 {
@@ -45,8 +31,3 @@ builder.Services.AddDbContext<GuardRelayContext>((serviceProvider, options) => {
 using IHost host = builder.Build();
 
 await host.RunAsync();
-if (args.Contains("--pause-on-exit"))
-{
-    Console.WriteLine("sleeping for 10 minutes");
-    await Task.Delay(1000 * 60 * 10);
-}
