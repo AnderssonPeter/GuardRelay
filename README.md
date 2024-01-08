@@ -51,3 +51,7 @@ It currently creates the following entities in home assistant:
 
 Add docker compose example
 
+## Todo:
+[ ] Healthcheck
+[ ] Dotnet format
+[ ] Loki logging
