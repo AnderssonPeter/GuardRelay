@@ -1,8 +1,6 @@
-# GuardRelay
-
 <p align="center">
   <a href="https://github.com/AnderssonPeter/GuardRelay">
-    <h3>GuardRelay</h3>
+    <h3 align="center">GuardRelay</h3>
   </a>
 
 
@@ -10,11 +8,11 @@
     Service that reads Charge Amps Amp Guard and sends it to MQTT (With Home Assistant device creation)
     <br />
     <br />
-    ·
+    Â·
     <a href="https://github.com/AnderssonPeter/GuardRelay/issues">Report Bug</a>
-    ·
+    Â·
     <a href="https://github.com/AnderssonPeter/GuardRelay/issues">Request Feature</a>
-    ·
+    Â·
   </p>
 </p>
 <br />
