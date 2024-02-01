@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -15,8 +10,7 @@ internal class Engine : BackgroundService
 {
     private readonly ChargeAmpGuardClient client;
     private readonly MQTTWriter mqttWriter;
-    private readonly IServiceScope serviceScope;
-    private GuardRelayContext guardRelayContext;
+    private readonly IServiceProvider serviceProvider;
     private readonly ILogger<Engine> logger;
     private readonly ApplicationOptions options;
 
@@ -24,17 +18,10 @@ internal class Engine : BackgroundService
     {
         this.client = client;
         this.mqttWriter = mqttWriter;
-        this.serviceScope = serviceProvider.CreateScope();
-        this.guardRelayContext = serviceScope.ServiceProvider.GetRequiredService<GuardRelayContext>();
+        this.serviceProvider = serviceProvider;
         this.logger = logger;
         this.options = options.Value;
 
-    }
-
-    public override void Dispose()
-    {
-        serviceScope.Dispose();
-        base.Dispose();
     }
 
     /// <summary>
@@ -49,19 +36,32 @@ internal class Engine : BackgroundService
         return (lastPower + currentPower) / 2 / 1000 * partOfHour;
     }
 
+    private async Task InitializeDatabaseAsync(CancellationToken stoppingToken)
+    {
+        using var scope = serviceProvider.CreateScope();
+        var guardRelayContext = scope.ServiceProvider.GetRequiredService<GuardRelayContext>();
+        await guardRelayContext.Database.MigrateAsync(stoppingToken);
+    }
+
+    private async Task<PowerSnapshot?> GetLastSnapshot(CancellationToken stoppingToken)
+    {
+        using var scope = serviceProvider.CreateScope();
+        var guardRelayContext = scope.ServiceProvider.GetRequiredService<GuardRelayContext>();
+        return await guardRelayContext.PowerSnapshots
+            .OrderBy(ps => ps.Timestamp)
+            .LastOrDefaultAsync(stoppingToken);
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         logger.LogInformation("Starting services");
-        await guardRelayContext.Database.MigrateAsync(stoppingToken);
-
+        await InitializeDatabaseAsync(stoppingToken);
 
         await client.ConnectAsync(stoppingToken);
         await mqttWriter.ConnectAsync(stoppingToken);
         await mqttWriter.ConfigureDeviceAsync(stoppingToken);
         
-        var lastDatabaseSnapshot = await guardRelayContext.PowerSnapshots
-            .OrderBy(ps => ps.Timestamp)
-            .LastOrDefaultAsync(stoppingToken);
+        var lastDatabaseSnapshot = await GetLastSnapshot(stoppingToken);
 
         (double EnergyLine1, double EnergyLine2, double EnergyLine3) totalEnergy = 
             lastDatabaseSnapshot != null ? 
@@ -75,36 +75,41 @@ internal class Engine : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            var watcher = Stopwatch.StartNew();
-            var timestamp = DateTimeOffset.Now;
-            var value = await client.FetchDataAsync(stoppingToken);
-            var duration = lastSnapshot.HasValue ? (timestamp - lastSnapshot.Value.Timestamp) : TimeSpan.Zero;
-
-            if (lastSnapshot != null && duration < options.FetchInterval * 10)
+            using (var scope = serviceProvider.CreateScope())
             {
-                //calculate power based on last snapshot
-                totalEnergy.EnergyLine1 += CalculateEnergy(lastSnapshot.Value.PowerLine1, value.Power[0], duration);
-                totalEnergy.EnergyLine2 += CalculateEnergy(lastSnapshot.Value.PowerLine2, value.Power[1], duration);
-                totalEnergy.EnergyLine3 += CalculateEnergy(lastSnapshot.Value.PowerLine3, value.Power[2], duration);
+                var guardRelayContext = scope.ServiceProvider.GetRequiredService<GuardRelayContext>();
 
-                //insert new value into database
-                guardRelayContext.PowerSnapshots.Add(new PowerSnapshot(timestamp, lastSnapshot.Value.PowerLine1, lastSnapshot.Value.PowerLine2, lastSnapshot.Value.PowerLine3, duration, totalEnergy.EnergyLine1, totalEnergy.EnergyLine2, totalEnergy.EnergyLine3));
-                await guardRelayContext.SaveChangesAsync(stoppingToken);
+                var watcher = Stopwatch.StartNew();
+                var timestamp = DateTimeOffset.Now;
+                var value = await client.FetchDataAsync(stoppingToken);
+                var duration = lastSnapshot.HasValue ? (timestamp - lastSnapshot.Value.Timestamp) : TimeSpan.Zero;
 
-                //send values to MQTT
-                await mqttWriter.SendValuesAsync(value, totalEnergy.EnergyLine1, totalEnergy.EnergyLine2, totalEnergy.EnergyLine3, stoppingToken);
-            }
+                if (lastSnapshot != null && duration < options.FetchInterval * 10)
+                {
+                    //calculate power based on last snapshot
+                    totalEnergy.EnergyLine1 += CalculateEnergy(lastSnapshot.Value.PowerLine1, value.Power[0], duration);
+                    totalEnergy.EnergyLine2 += CalculateEnergy(lastSnapshot.Value.PowerLine2, value.Power[1], duration);
+                    totalEnergy.EnergyLine3 += CalculateEnergy(lastSnapshot.Value.PowerLine3, value.Power[2], duration);
 
-            if (lastSnapshot == null || duration >= options.FetchInterval * 10 || 
-                lastSnapshot.Value.PowerLine1 != value.Power[0] || lastSnapshot.Value.PowerLine2 != value.Power[1] || lastSnapshot.Value.PowerLine3 != value.Power[2])
-            {
-                lastSnapshot = (timestamp, value.Power[0], value.Power[1], value.Power[2]);
-            }
+                    //insert new value into database
+                    guardRelayContext.PowerSnapshots.Add(new PowerSnapshot(timestamp, lastSnapshot.Value.PowerLine1, lastSnapshot.Value.PowerLine2, lastSnapshot.Value.PowerLine3, duration, totalEnergy.EnergyLine1, totalEnergy.EnergyLine2, totalEnergy.EnergyLine3));
+                    await guardRelayContext.SaveChangesAsync(stoppingToken);
+
+                    //send values to MQTT
+                    await mqttWriter.SendValuesAsync(value, totalEnergy.EnergyLine1, totalEnergy.EnergyLine2, totalEnergy.EnergyLine3, stoppingToken);
+                }
+
+                if (lastSnapshot == null || duration >= options.FetchInterval * 10 || 
+                    lastSnapshot.Value.PowerLine1 != value.Power[0] || lastSnapshot.Value.PowerLine2 != value.Power[1] || lastSnapshot.Value.PowerLine3 != value.Power[2])
+                {
+                    lastSnapshot = (timestamp, value.Power[0], value.Power[1], value.Power[2]);
+                }
             
-            watcher.Stop();
-            if (watcher.Elapsed < options.FetchInterval)
-            {
-                await Task.Delay(options.FetchInterval - watcher.Elapsed);
+                watcher.Stop();
+                if (watcher.Elapsed < options.FetchInterval)
+                {
+                    await Task.Delay(options.FetchInterval - watcher.Elapsed);
+                }
             }
         }
     }
