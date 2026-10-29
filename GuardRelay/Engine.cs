@@ -81,7 +81,17 @@ internal class Engine : BackgroundService
 
                 var watcher = Stopwatch.StartNew();
                 var timestamp = DateTimeOffset.Now;
-                var value = await client.FetchDataAsync(stoppingToken);
+                ChargeAmpGuardResponse value;
+                try
+                {
+                    value = await client.FetchDataAsync(stoppingToken);
+                }
+                catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
+                {
+                    logger.LogWarning(ex, "Failed to fetch data from ChargeAmpGuard, retrying in {interval}", options.FetchInterval);
+                    await Task.Delay(options.FetchInterval, stoppingToken);
+                    continue;
+                }
                 var duration = lastSnapshot.HasValue ? (timestamp - lastSnapshot.Value.Timestamp) : TimeSpan.Zero;
 
                 if (lastSnapshot != null && duration < options.FetchInterval * 10)

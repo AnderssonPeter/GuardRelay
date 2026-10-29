@@ -14,6 +14,7 @@ class ChargeAmpGuardClientOptions
 {
     public Uri Uri { get; set; } = null!;
     public string Pin { get; set; } = null!;
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);
 }
 
 enum ChargeAmpGuardClientState
@@ -48,9 +49,21 @@ class ChargeAmpGuardClient : IDisposable
 
     public async Task ConnectAsync(CancellationToken cancellationToken)
     {
-        if (client != null && client.State == WebSocketState.Open)
+        if (client != null)
         {
-            await client.CloseAsync(WebSocketCloseStatus.NormalClosure, null, cancellationToken);
+            if (client.State == WebSocketState.Open)
+            {
+                try
+                {
+                    using var closeTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    closeTimeout.CancelAfter(options.Timeout);
+                    await client.CloseAsync(WebSocketCloseStatus.NormalClosure, null, closeTimeout.Token);
+                }
+                catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+                {
+                    logger.LogDebug(ex, "Failed to close old connection to ChargeAmpGuard");
+                }
+            }
             client.Dispose();
         }
         logger.LogInformation("Connecting to ChargeAmpGuard");
@@ -59,7 +72,18 @@ class ChargeAmpGuardClient : IDisposable
         client.Options.KeepAliveInterval = TimeSpan.Zero;
         client.Options.DangerousDeflateOptions = new WebSocketDeflateOptions();
         State = ChargeAmpGuardClientState.Connecting;
-        await client.ConnectAsync(options.Uri, cancellationToken);
+        using (var connectTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
+        {
+            connectTimeout.CancelAfter(options.Timeout);
+            try
+            {
+                await client.ConnectAsync(options.Uri, connectTimeout.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                throw new TimeoutException($"Timed out connecting to ChargeAmpGuard after {options.Timeout}");
+            }
+        }
         State = ChargeAmpGuardClientState.Connected;
         await PreAuthenticateAsync(cancellationToken);
         await AuthenticateAsync(cancellationToken);
@@ -90,9 +114,9 @@ class ChargeAmpGuardClient : IDisposable
     public async Task<ChargeAmpGuardResponse> FetchDataAsync(CancellationToken cancellationToken)
     {
         logger.LogDebug("FetchDataAsync");
-        if (client.State != WebSocketState.Open)
+        if (client.State != WebSocketState.Open || State != ChargeAmpGuardClientState.Authenticated)
         {
-            logger.LogWarning("Connection to ChageAmpsGuard expected open but was {state}, reconnecting!", client.State);
+            logger.LogWarning("Connection to ChageAmpsGuard expected open and authenticated but was {socketState}/{state}, reconnecting!", client.State, State);
             await ConnectAsync(cancellationToken);
         }
         if (State != ChargeAmpGuardClientState.Authenticated)
@@ -106,21 +130,32 @@ class ChargeAmpGuardClient : IDisposable
 
     private async Task<string> SendAndReceiveAsync(char requestOp, char responseOp, string message, CancellationToken cancellationToken)
     {
-        logger.LogTrace("Sending '{requestOp},{message}'", requestOp, message);
-        await client.SendAsync(Encoding.ASCII.GetBytes(requestOp + "," + message), WebSocketMessageType.Text, true, cancellationToken);
-        
+        // Without a timeout a request the Guard never answers would hang forever,
+        // cancelling aborts the socket so the next fetch reconnects
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(options.Timeout);
+
         var receiveBuffer = new byte[1024];
         var offset = 0;
-
-        logger.LogTrace("Receiving '{responseOp}'", responseOp);
-        while (true)
+        try
         {
-            var result = await client.ReceiveAsync(new ArraySegment<byte>(receiveBuffer, offset, receiveBuffer.Length - offset), cancellationToken);
-            offset += result.Count;
-            if (result.EndOfMessage)
+            logger.LogTrace("Sending '{requestOp},{message}'", requestOp, message);
+            await client.SendAsync(Encoding.ASCII.GetBytes(requestOp + "," + message), WebSocketMessageType.Text, true, timeout.Token);
+
+            logger.LogTrace("Receiving '{responseOp}'", responseOp);
+            while (true)
             {
-                break;
+                var result = await client.ReceiveAsync(new ArraySegment<byte>(receiveBuffer, offset, receiveBuffer.Length - offset), timeout.Token);
+                offset += result.Count;
+                if (result.EndOfMessage)
+                {
+                    break;
+                }
             }
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException($"No response from ChargeAmpGuard within {options.Timeout}");
         }
         var content = Encoding.ASCII.GetString(receiveBuffer, 0, offset);
         logger.LogTrace("Received '{content}'", content);
