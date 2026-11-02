@@ -1,11 +1,11 @@
-FROM mcr.microsoft.com/dotnet/runtime:8.0 AS base
+FROM mcr.microsoft.com/dotnet/runtime:10.0 AS base
 
 MAINTAINER Peter Andersson
 
 USER app
 WORKDIR /app
 
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG APP_VERSION=0.0.0
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src

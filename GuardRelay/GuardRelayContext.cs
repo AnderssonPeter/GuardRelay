@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection.Metadata;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace GuardRelay;
@@ -18,7 +12,7 @@ public class GuardRelayContext : DbContext
 
     public GuardRelayContext(DbContextOptions<GuardRelayContext> options) : base(options)
     {
-        
+
     }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)

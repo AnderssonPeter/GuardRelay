@@ -1,16 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
+﻿using System.Reflection;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MQTTnet;
-using MQTTnet.Client;
-using MQTTnet.Diagnostics;
+using MQTTnet.Diagnostics.Logger;
 
 namespace GuardRelay;
 
@@ -70,7 +65,7 @@ class MQTTLogger : IMqttNetLogger
 
 class MQTTWriter : IDisposable
 {
-    private readonly MqttFactory mqttFactory = new();
+    private readonly MqttClientFactory mqttFactory = new();
     private IMqttClient mqttClient;
     private readonly MqttClientOptions mqttClientOptions;
     private readonly IOptions<MQTTOptions> options;
@@ -94,7 +89,7 @@ class MQTTWriter : IDisposable
             if (!string.IsNullOrEmpty(connectionOptions.ClientCertificate))
             {
                 var bytes = File.ReadAllBytes(connectionOptions.ClientCertificate);
-                var certificate = new X509Certificate2(bytes);
+                var certificate = X509CertificateLoader.LoadCertificate(bytes);
                 builder.WithClientCertificates([certificate]);
             }
         });
